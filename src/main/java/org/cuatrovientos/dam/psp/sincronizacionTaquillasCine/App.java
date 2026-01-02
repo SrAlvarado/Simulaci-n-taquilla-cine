@@ -1,19 +1,25 @@
 package org.cuatrovientos.dam.psp.sincronizacionTaquillasCine;
 
+import java.util.ArrayList;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Queue;
 import java.util.Random;
 
 public class App {
     public static void main(String[] args) {
-        System.out.println("--- Inicio Simulación Cine V1 ---");
+        System.out.println("--- Inicio Simulación Cine V2 (Múltiples Colas) ---");
 
         Cine cine = new Cine(Configuracion.NOMBRE_CINE, Configuracion.NUMERO_ASIENTOS);
-        Queue<Integer> colaInfinita = new LinkedList<>(); 
+        
+        List<Queue<Integer>> colas = new ArrayList<>();
+        for (int i = 0; i < Configuracion.NUMERO_COLAS; i++) {
+            colas.add(new LinkedList<>());
+        }
 
         Taquilla[] taquillas = new Taquilla[Configuracion.NUMERO_TAQUILLAS];
         for (int i = 0; i < Configuracion.NUMERO_TAQUILLAS; i++) {
-            taquillas[i] = new Taquilla(i + 1, cine, colaInfinita);
+            taquillas[i] = new Taquilla(i + 1, cine, colas);
             taquillas[i].start();
         }
 
@@ -21,14 +27,33 @@ public class App {
         long tiempoFin = tiempoInicio + (Configuracion.TIEMPO_SIMULACION_MINUTOS * 60 * 1000); 
         
         int contadorClientes = 1;
+        int clientesRechazados = 0;
         Random random = new Random();
 
         try {
             while (System.currentTimeMillis() < tiempoFin && cine.getAsientosDisponibles() > 0) {
-                synchronized (colaInfinita) {
-                    colaInfinita.add(contadorClientes);
-                    System.out.println("Nuevo cliente " + contadorClientes + " entró a la cola. (Cola: " + colaInfinita.size() + ")");
+                Queue<Integer> mejorCola = null;
+                int minTamano = Integer.MAX_VALUE;
+
+                for (Queue<Integer> cola : colas) {
+                    synchronized (cola) {
+                        if (cola.size() < minTamano) {
+                            minTamano = cola.size();
+                            mejorCola = cola;
+                        }
+                    }
                 }
+
+                if (mejorCola != null && minTamano < Configuracion.MAX_PERSONAS_COLA) {
+                    synchronized (mejorCola) {
+                        mejorCola.add(contadorClientes);
+                        System.out.println("Cliente " + contadorClientes + " entró en una cola (Tamaño: " + mejorCola.size() + ")");
+                    }
+                } else {
+                    clientesRechazados++;
+                    System.out.println("Cliente " + contadorClientes + " SE FUE (Colas llenas).");
+                }
+                
                 contadorClientes++;
 
                 int tiempoLlegada = random.nextInt(
@@ -41,7 +66,7 @@ public class App {
             e.printStackTrace();
         }
 
-        System.out.println("--- Tiempo finalizado o Cine lleno. Cerrando taquillas... ---");
+        System.out.println("--- Cerrando taquillas... ---");
         for (Taquilla t : taquillas) {
             t.cerrarTaquilla();
             try {
@@ -51,9 +76,15 @@ public class App {
             }
         }
 
-        System.out.println("\n--- RESULTADOS ---");
+        int totalEnColas = 0;
+        for(Queue<Integer> q : colas) {
+            totalEnColas += q.size();
+        }
+
+        System.out.println("\n--- RESULTADOS V2 ---");
         System.out.println("Entradas vendidas: " + cine.getEntradasVendidas());
-        System.out.println("Gente que se quedó en la cola (sin entrada): " + colaInfinita.size());
+        System.out.println("Clientes atendidos pero esperando en cola al cierre: " + totalEnColas);
+        System.out.println("Clientes rechazados (Colas llenas): " + clientesRechazados);
         System.out.println("Asientos libres: " + cine.getAsientosDisponibles());
     }
 }

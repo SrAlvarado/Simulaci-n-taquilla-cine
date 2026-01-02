@@ -1,19 +1,20 @@
 package org.cuatrovientos.dam.psp.sincronizacionTaquillasCine;
 
+import java.util.List;
 import java.util.Queue;
 import java.util.Random;
 
 public class Taquilla extends Thread {
     private int idTaquilla;
     private Cine cine;
-    private Queue<Integer> colaClientes;
+    private List<Queue<Integer>> colas;
     private boolean abierta;
     private Random random;
 
-    public Taquilla(int id, Cine cine, Queue<Integer> colaClientes) {
+    public Taquilla(int id, Cine cine, List<Queue<Integer>> colas) {
         this.idTaquilla = id;
         this.cine = cine;
-        this.colaClientes = colaClientes;
+        this.colas = colas;
         this.abierta = true;
         this.random = new Random();
     }
@@ -23,13 +24,7 @@ public class Taquilla extends Thread {
         System.out.println("Taquilla " + idTaquilla + " abierta.");
         
         while (abierta && cine.getAsientosDisponibles() > 0) {
-            Integer cliente = null;
-            
-            synchronized (colaClientes) {
-                if (!colaClientes.isEmpty()) {
-                    cliente = colaClientes.poll();
-                }
-            }
+            Integer cliente = buscarCliente();
 
             if (cliente != null) {
                 procesarVenta(cliente);
@@ -43,6 +38,17 @@ public class Taquilla extends Thread {
             }
         }
         System.out.println("Taquilla " + idTaquilla + " cerrando.");
+    }
+
+    private Integer buscarCliente() {
+        for (Queue<Integer> cola : colas) {
+            synchronized (cola) {
+                if (!cola.isEmpty()) {
+                    return cola.poll();
+                }
+            }
+        }
+        return null;
     }
 
     private void procesarVenta(int idCliente) {
@@ -62,7 +68,6 @@ public class Taquilla extends Thread {
             }
             
         } catch (InterruptedException e) {
-            System.out.println("Taquilla " + idTaquilla + " interrumpida durante venta.");
             Thread.currentThread().interrupt();
         }
     }

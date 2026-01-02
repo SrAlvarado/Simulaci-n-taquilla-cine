@@ -11,6 +11,16 @@ public class Cine {
         this.entradasVendidas = 0;
     }
 
+    public synchronized boolean venderEntrada() {
+        if (asientosDisponibles > 0) {
+            asientosDisponibles--;
+            entradasVendidas++;
+            System.out.println("Entrada vendida. Quedan " + asientosDisponibles + " asientos.");
+            return true;
+        }
+        return false;
+    }
+
     public int getEntradasVendidas() {
         return entradasVendidas;
     }
